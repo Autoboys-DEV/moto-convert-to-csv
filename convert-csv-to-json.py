@@ -67,8 +67,8 @@ for file_name in file_names:
     )
 
     # Convert to JSON
-    json_rows = [json.dumps(row.asDict()) for row in current_df.drop("input_file_name").collect()]
-    json_data = "\n".join(json_rows)
+    json_data_list = [row.asDict() for row in current_df.drop("input_file_name").collect()]
+    json_data = json.dumps(json_data_list, indent=4)  # The indent parameter will pretty-print the JSON
 
     # Upload the new file as fileName_new.json
     s3_client.put_object(
