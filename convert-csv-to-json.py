@@ -49,14 +49,31 @@ for file_name in file_names:
     # Extract the base file name without path and extension
     base_file_name = os.path.basename(file_name.input_file_name).replace('.csv', '')
     
+    # Delete the corresponding _old file
+    s3_client.delete_object(
+        Bucket='moto-pricefile-dump',
+        Key=f'convertedFiles/{base_file_name}_old.json'
+    )
+
+    # Rename the _new file that's already there to the _old name
+    s3_client.copy_object(
+        Bucket='moto-pricefile-dump',
+        CopySource=f"moto-pricefile-dump/convertedFiles/{base_file_name}_new.json",
+        Key=f'convertedFiles/{base_file_name}_old.json'
+    )
+    s3_client.delete_object(
+        Bucket='moto-pricefile-dump',
+        Key=f'convertedFiles/{base_file_name}_new.json'
+    )
+
     # Convert to JSON
     json_rows = [json.dumps(row.asDict()) for row in current_df.drop("input_file_name").collect()]
     json_data = "\n".join(json_rows)
-    
-    # Upload to S3 using boto3
+
+    # Upload the new file as fileName_new.json
     s3_client.put_object(
         Bucket='moto-pricefile-dump',
-        Key=f'convertedFiles/{base_file_name}.json',
+        Key=f'convertedFiles/{base_file_name}_new.json',
         Body=json_data
     )
 
