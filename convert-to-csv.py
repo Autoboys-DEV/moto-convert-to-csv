@@ -1,5 +1,8 @@
 import sys
 import os
+import boto3
+import json
+from io import StringIO
 from awsglue.dynamicframe import DynamicFrame
 from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
@@ -38,14 +41,23 @@ df_with_filename = df.withColumn("input_file_name", input_file_name())
 # Extract unique file names
 file_names = df_with_filename.select('input_file_name').distinct().collect()
 
-# Loop over each unique file name
+s3_client = boto3.client('s3')
+
 for file_name in file_names:
     current_df = df_with_filename.filter(df_with_filename["input_file_name"] == file_name.input_file_name)
     
     # Extract the base file name without path and extension
     base_file_name = os.path.basename(file_name.input_file_name).replace('.csv', '')
     
-    # Write the DataFrame to S3 in JSON format with the same base name, and drop the 'input_file_name' column
-    current_df.drop("input_file_name").write.json(f"s3://moto-pricefile-dump/convertedFiles/{base_file_name}.json")
+    # Convert to JSON
+    json_rows = [json.dumps(row.asDict()) for row in current_df.drop("input_file_name").collect()]
+    json_data = "\n".join(json_rows)
+    
+    # Upload to S3 using boto3
+    s3_client.put_object(
+        Bucket='moto-pricefile-dump',
+        Key=f'convertedFiles/{base_file_name}.json',
+        Body=json_data
+    )
 
 job.commit()
